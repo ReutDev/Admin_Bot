@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import time
 
 import aiohttp
 from aiogram import Router
@@ -16,6 +16,13 @@ router = Router()
 config = load_config()
 
 logger = logging.getLogger(__name__)
+
+
+async def translate_text(text, dest_language):
+    loop = asyncio.get_event_loop()
+    translator = Translator()
+    translation = await loop.run_in_executor(None, translator.translate, text, dest_language)
+    return translation
 
 
 @router.message(Command(commands='rating'))
@@ -66,16 +73,22 @@ async def cmd_fact(message: Message):
 
                     if data:  # Проверяем, что ответ не пустой
                         fact = data[0]['fact']
-                        translator = Translator()
-                        translation = translator.translate(fact, dest="ru")
-                        await message.reply(f'<b>{translation.text}</b>')
+                        try:
+                            translation = await translate_text(fact, "ru")
+                            if translation is not None and hasattr(translation, 'text'):
+                                await message.reply(f'<b>{translation.text}</b>')
+                            else:
+                                await message.reply("Не удалось перевести факт 😞, попробуйте позже.")
+                        except Exception as e:
+                            logger.exception(f"Translation error: {e}")
+                            await message.reply("Произошла ошибка при попытке перевести факт 😞, попробуйте позже.")
                     else:
-                        await message.reply("Не удалось получить факт.")
+                        await message.reply("Не удалось получить факт 😞, попробуйте позже.")
                 else:
                     await message.reply(LEXICON['error_fact'])
         except Exception as e:
-            await message.reply("Произошла ошибка при попытке получить факт.")
-            logger.info(f"Error fetching FACT: {e}")  # Логирование ошибки
+            await message.reply("Произошла ошибка при попытке получить факт 😞, попробуйте позже.")
+            logger.info(f"Error fetching FACT: {e}")
 
 
 @router.message(Command(commands='joke'))
@@ -88,18 +101,24 @@ async def cmd_joke(message: Message):
                 if response.status == 200:
                     data = await response.json()
 
-                    if data:  # Проверяем, что ответ не пустой
+                    if data:
                         jokes = data[0]['joke']
-                        translator = Translator()
-                        translation = translator.translate(jokes, dest="ru")
-                        await message.reply(f'<b>{translation.text}</b>')
+                        try:
+                            translation = await translate_text(jokes, "ru")
+                            if translation is not None and hasattr(translation, 'text'):
+                                await message.reply(f'<b>{translation.text}</b>')
+                            else:
+                                await message.reply("Не удалось перевести шутку 😞, попробуйте позже.")
+                        except Exception as e:
+                            logger.exception(f"Translation error: {e}")
+                            await message.reply("Произошла ошибка при попытке перевести шутку 😞, попробуйте позже.")
                     else:
-                        await message.reply("Не удалось получить шутку.")
+                        await message.reply("Не удалось получить шутку 😞, попробуйте позже.")
                 else:
                     await message.reply(LEXICON['error_fact'])
         except Exception as e:
-            await message.reply("Произошла ошибка при попытке получить шутку.")
-            logger.info(f"Error fetching JOKE: {e}")  # Логирование ошибки
+            await message.reply("Произошла ошибка при попытке получить шутку 😞, попробуйте позже.")
+            logger.info(f"Error fetching JOKE: {e}")
 
 
 @router.message(Command(commands='riddles'))
@@ -114,17 +133,27 @@ async def cmd_riddles(message: Message):
 
                     if data:  # Проверяем, что ответ не пустой
                         riddles = data[0]['question']
-                        translator = Translator()
-                        question = translator.translate(riddles, dest="ru")
-                        answer = translator.translate(data[0]['answer'], dest="ru")
-                        await message.reply(f'<b>{question.text}</b>\n\n'
-                                            f'Ответ появится через 15 секунд')
-                        time.sleep(15)
-                        await message.reply(f'<b>{answer.text}</b>')
+                        answer_text = data[0]['answer']
+
+                        try:
+                            question_translation = await translate_text(riddles, "ru")
+                            answer_translation = await translate_text(answer_text, "ru")
+
+                            if question_translation is not None and hasattr(question_translation, 'text') and \
+                                    answer_translation is not None and hasattr(answer_translation, 'text'):
+                                await message.reply(f'<b>{question_translation.text}</b>\n\n'
+                                                    f'Ответ появится через 15 секунд')
+                                await asyncio.sleep(15)
+                                await message.reply(f'<b>{answer_translation.text}</b>')
+                            else:
+                                await message.reply("Не удалось перевести загадку 😞, попробуйте позже.")
+                        except Exception as e:
+                            logger.exception(f"Translation error: {e}")
+                            await message.reply("Произошла ошибка при попытке перевести загадку 😞, попробуйте позже.")
                     else:
-                        await message.reply("Не удалось получить загадку.")
+                        await message.reply("Не удалось получить загадку 😞, попробуйте позже.")
                 else:
                     await message.reply(LEXICON['error_fact'])
         except Exception as e:
-            await message.reply("Произошла ошибка при попытке получить загадку.")
-            logger.info(f"Error fetching RIDDLE: {e}")  # Логирование ошибки
+            await message.reply("Произошла ошибка при попытке получить загадку 😞, попробуйте позже.")
+            logger.info(f"Error fetching RIDDLE: {e}")
